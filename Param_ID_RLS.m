@@ -28,7 +28,10 @@ theta_1 = ppval(spl_1,t);  %this is a 1x1000 array, ex. to index the last column
 %spl_3 = spline(x_3,y_3);
 %theta_3 = ppval(spl_3,t);
 
+% -----------------------
+% Figure 4 Creation
 % Plot the input and cases
+% -----------------------
 figure(1)
 plot(x_1,y_1,'x','MarkerEdgeColor','black')
 hold on
@@ -46,7 +49,9 @@ ylabel('Angular Pos. [deg] / Torque [Nm]')
 % θ is fed from the arrays theta_<1,2,3> from the prev section
 % w = deltaθ/delta_t 
 % Tc is fed from the Tc array from the prev section
+%---------------------------------------------------------------
 
+% output Case 1 - X_k_1 creation 
 w_1 = zeros(1001,1);
 for ctr = 2:1:1000
     prev = ctr -1 ;
@@ -57,6 +62,13 @@ X_k_1 = ones( (T_tot/delta_t)+1 , 4 );
 X_k_1(:,2) = theta_1';
 X_k_1(:,3) = w_1;
 X_k_1(:,4) = Tc';
+
+% output Case 2 - X_k_2 creation 
+
+
+% output Case 3 - X_k_3 creation 
+
+
 
 %% RLS Parameter Identification w/ EFRA Algorithm
 % Use eqs 18-21 from Section V-B. 
@@ -76,12 +88,10 @@ X_k_1(:,4) = Tc';
 
 % initial conditions
 Phi_k_init = [0 0 0 0];    %given
-X_k_init = [1, 0, 0, 0];   % I chose the "0"'s, but the "1" is given
-model_Y_k_init = 0;        % I chose
+model_Y_k_init = -1;        % I chose this randomly, but knew it couldnt = 0
+sigma = 50;              % I chose but it says should be >>0
+P_k_init = sigma*eye(4);   % I think cov mat should be a 4x4  
 
-sigma = 1000;               % I chose but it says should be >>0
-%P_k_init = sigma*eye(4)   % I think cov mat should be a 4x4  
-P_k_init = sigma;
 % --------------------------
 % EFRA algorithm description: 
 % --------------------------
@@ -91,34 +101,105 @@ P_k_init = sigma;
     
 % Step 1 --initialize the variables for EFRA 
 Phi_k_curr = Phi_k_init;
-X_k = X_k_init;
 y_k_curr = model_Y_k_init;
 P_k_curr = P_k_init;
 
 % Step 2&3 --at each time step k calc new y_k & K_k, then new Phi_k & P_k
 k = t/delta_t;
-Phi_k_list = zeros(1001,4)
-len_X_k = (T_tot/delta_t)+1;
-for each = 1:1:len_X_k
-    X_k_in = X_k_1(each,:)
-    [y_k_new, K_k, Phi_k_new, P_k_new] = EFRA(X_k_in, P_k_curr, Phi_k_curr,y_k_curr)   
+Phi_k_list_case1 = zeros(1001,4);
+Phi_k_list_case2 = zeros(1001,4);
+Phi_k_list_case3 = zeros(1001,4);
+[row_X_k,col] = size(X_k_1);   %X_k is same size for all cases
+
+
+% output Case 1 - Parameter ID'ing via EFRA RLS method 
+for each = 1:1:row_X_k
+    X_k_in = X_k_1(each,:);
+    [y_k_new, K_k, Phi_k_new, P_k_new] = EFRA(X_k_in, P_k_curr, Phi_k_curr,y_k_curr)  ; 
    
     y_k_curr = y_k_new; 
     Phi_k_curr = Phi_k_new;
     P_k_curr = P_k_new;
 
-    Phi_k_list(each,:) = Phi_k_curr;
+    Phi_k_list_case1(each,:) = Phi_k_curr;
 
 end
 
 
+% output Case 2 - Parameter ID'ing via EFRA RLS method 
+
+
+% output Case 3 - Parameter ID'ing via EFRA RLS method 
 
 
 
 
+% ----------------------------------
+% Plot the output parameters (Fig 5)
+% ----------------------------------
+figure(2)
+subplot(2,2,1)
+x = t;
+phi0_case1 = Phi_k_list_case1(:,1);
+plot(x,phi0_case1)
+title('Subplot 1: Phi-0)')
+
+subplot(2,2,2)
+phi1_case1 = Phi_k_list_case1(:,2);
+plot(x,phi1_case1)
+title('Subplot 2: Phi-1)')
+
+subplot(2,2,3)
+phi2_case1 = Phi_k_list_case1(:,3);
+plot(x,phi2_case1)
+title('Subplot 3: Phi-2)')
+
+subplot(2,2,4)
+phi3_case1 = Phi_k_list_case1(:,4);
+plot(x,phi3_case1)
+title('Subplot 4: Phi-3)')
 
 
 
+%% Mechanical Impedance Property Determination
+% Determine J_eq, b_eq, and k_eq from eq.15/16
+% From the previous section, we calc'd phi1-3
+% phi-1 = -(delta_t*k_eq)/J_eq --> k_eq = -(phi1*J_eq)/delta_T
+% phi-2 = 1- (delta_t*b_eq)/J_eq --> b_eq = [J_eq - (phi2*J_eq)] / delta_t
+% phi-3 = delta_t/J_eq --> J_eq = delta_t/phi3
+% ---------------------------------------------
+
+% Case 1 property determination
+J_eq_case1 = delta_t./phi3_case1 ;
+b_eq_case1 = (J_eq_case1 - (phi2_case1.*J_eq_case1)) ./delta_t ;
+k_eq_case1 = -1.*(phi1_case1.*J_eq_case1) ./delta_t ;
+
+% Case 2 property determination
+
+
+% Case 3 property determination
+
+
+
+% ----------------------------------
+% Plot the output properties (Fig 6)
+% ----------------------------------
+figure(3)
+subplot(3,1,1)
+x = t;
+plot(x,J_eq_case1)
+title('Subplot 1: J_eq)')
+ylim([-10,10])  %added limits for viewing purposes only
+
+subplot(3,1,2)
+plot(x,b_eq_case1)
+title('Subplot 2: b_eq)')
+ylim([-500,0])
+ 
+subplot(3,1,3)
+plot(x,k_eq_case1)
+title('Subplot 3: k_eq)')
+ylim([-10,10])
 
 
 
